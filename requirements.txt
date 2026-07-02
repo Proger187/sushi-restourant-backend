@@ -3,6 +3,7 @@ djangorestframework
 django-cors-headers
 djangorestframework-simplejwt
 psycopg2-binary
+dj-database-url
 python-dotenv
 Pillow
 cloudinary
