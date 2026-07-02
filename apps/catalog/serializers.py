@@ -18,7 +18,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class ProductListSerializer(serializers.ModelSerializer):
-    category = serializers.SerializerMethodField()
+    category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all())
 
     class Meta:
         model = Product
@@ -27,11 +27,9 @@ class ProductListSerializer(serializers.ModelSerializer):
             "weight_g", "pieces", "is_available", "is_featured", "category",
         ]
 
-    def get_category(self, obj):
-        return {"id": obj.category_id, "name": obj.category.name}
-
     def to_representation(self, instance):
         data = super().to_representation(instance)
+        data["category"] = {"id": instance.category_id, "name": instance.category.name}
         request = self.context.get("request")
         if request:
             data["image"] = get_image_url(request, instance.image)
