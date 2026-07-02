@@ -21,8 +21,8 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'cloudinary_storage',
     'django.contrib.staticfiles',
+    'cloudinary_storage',
     'cloudinary',
     'rest_framework',
     'corsheaders',
@@ -164,8 +164,10 @@ SIMPLE_JWT = {
 if os.getenv("RAILWAY_ENVIRONMENT"):
     DEBUG = False
     ALLOWED_HOSTS = ["*"]  # потом заменишь на свой домен
-    
+
     # Статические файлы через whitenoise
     MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
-    STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    STORAGES["staticfiles"] = {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    }
     STATIC_ROOT = BASE_DIR / "staticfiles"
