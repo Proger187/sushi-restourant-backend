@@ -20,15 +20,22 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'cloudinary_storage',
     'django.contrib.staticfiles',
+    'cloudinary',
     'rest_framework',
     'corsheaders',
     'rest_framework_simplejwt',
+    'apps.accounts',
     'apps.catalog',
     'apps.orders',
     'apps.delivery',
-    'apps.users',
 ]
+
+# ⚠️ Changing AUTH_USER_MODEL requires fresh migrations.
+# Run: python manage.py migrate (after dropping all migration files except __init__.py)
+# Or reset the DB: dropdb sushi_db && createdb sushi_db && python manage.py migrate
+AUTH_USER_MODEL = "accounts.Customer"
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -78,6 +85,24 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "SOCKET_CONNECT_TIMEOUT": 0.2,
+            "SOCKET_TIMEOUT": 0.2,
+            "IGNORE_EXCEPTIONS": True,
+        },
+        "KEY_PREFIX": "sushigarden",
+        "TIMEOUT": 300,
+    }
+}
+
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_CACHE_ALIAS = "default"
+
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
@@ -88,7 +113,19 @@ STATIC_URL = 'static/'
 MEDIA_ROOT = BASE_DIR / 'media'
 MEDIA_URL = '/media/'
 
-IMAGE_STORAGE = 'local'
+# Product/category images are stored on Cloudinary (credentials via CLOUDINARY_URL
+# in .env). MEDIA_ROOT/MEDIA_URL above are kept only to still serve the pre-migration
+# local files in ./media/ if anything still references them.
+STORAGES = {
+    "default": {
+        "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
+IMAGE_STORAGE = 'cloudinary'
 MAX_IMAGE_SIZE_MB = 5
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -105,9 +142,12 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.AllowAny',
     ],
     'UNAUTHENTICATED_USER': None,
+    'EXCEPTION_HANDLER': 'apps.orders.exceptions.ratelimit_exception_handler',
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=2),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=30),
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
 }

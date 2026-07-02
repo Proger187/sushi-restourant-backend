@@ -56,6 +56,11 @@ class Order(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status"]),
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["order_number"]),
+        ]
 
     def __str__(self):
         return self.order_number
@@ -101,6 +106,9 @@ class OrderStatusHistory(models.Model):
 
     class Meta:
         ordering = ["changed_at"]
+        indexes = [
+            models.Index(fields=["order", "changed_at"]),
+        ]
 
     def __str__(self):
         return f"{self.order.order_number} → {self.status}"

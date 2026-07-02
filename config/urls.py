@@ -9,7 +9,7 @@ urlpatterns = [
     path("api/", include("apps.catalog.urls")),
     path("api/", include("apps.orders.urls")),
     path("api/", include("apps.delivery.urls")),
-    path("api/", include("apps.users.urls")),
+    path("api/", include("apps.accounts.urls")),
     path("api/auth/token/", TokenObtainPairView.as_view()),
     path("api/auth/token/refresh/", TokenRefreshView.as_view()),
 ]

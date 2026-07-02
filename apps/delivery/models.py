@@ -20,7 +20,7 @@ class DeliveryZone(models.Model):
 
 
 class RestaurantSettings(models.Model):
-    name = models.CharField(max_length=200, default="Sushi Restaurant")
+    name = models.CharField(max_length=200, default="Sushi Garden")
     address = models.TextField(default="")
     latitude = models.FloatField(default=0.0)
     longitude = models.FloatField(default=0.0)
@@ -40,7 +40,7 @@ class RestaurantSettings(models.Model):
         obj, _ = cls.objects.get_or_create(
             pk=1,
             defaults={
-                "name": os.getenv("RESTAURANT_NAME", "Sushi Restaurant"),
+                "name": os.getenv("RESTAURANT_NAME", "Sushi Garden"),
                 "address": os.getenv("RESTAURANT_ADDRESS", ""),
                 "latitude": float(os.getenv("RESTAURANT_LAT", "51.1279")),
                 "longitude": float(os.getenv("RESTAURANT_LNG", "71.4304")),

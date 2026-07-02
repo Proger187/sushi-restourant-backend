@@ -42,6 +42,10 @@ class Product(models.Model):
 
     class Meta:
         ordering = ["category__sort_order", "name"]
+        indexes = [
+            models.Index(fields=["is_available", "category"]),
+            models.Index(fields=["is_featured"]),
+        ]
 
     def __str__(self):
         return self.name

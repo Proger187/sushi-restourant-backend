@@ -1,11 +1,14 @@
+from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
+from django.utils.decorators import method_decorator
+from django_ratelimit.decorators import ratelimit
 from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveAPIView
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
 
-from .models import Order
+from .models import Order, OrderItem, OrderStatusHistory
 from .serializers import (
     AdminOrderSerializer,
     AdminOrderStatusUpdateSerializer,
@@ -14,8 +17,16 @@ from .serializers import (
 )
 
 
+def _order_prefetch():
+    return [
+        Prefetch("items", queryset=OrderItem.objects.select_related("product")),
+        Prefetch("status_history", queryset=OrderStatusHistory.objects.order_by("changed_at")),
+    ]
+
+
 # --- Customer ---
 
+@method_decorator(ratelimit(key="ip", rate="10/h", method="POST", block=True), name="dispatch")
 class CustomerOrderListCreateView(ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = OrderCreateSerializer
@@ -27,8 +38,9 @@ class CustomerOrderListCreateView(ListCreateAPIView):
 
     def get_queryset(self):
         return (
-            Order.objects.filter(user=self.request.user)
-            .prefetch_related("items", "status_history")
+            Order.objects
+            .filter(user=self.request.user)
+            .prefetch_related(*_order_prefetch())
         )
 
     def create(self, request, *args, **kwargs):
@@ -50,7 +62,10 @@ class CustomerOrderListCreateView(ListCreateAPIView):
 class OrderDetailView(RetrieveAPIView):
     permission_classes = [AllowAny]
     serializer_class = OrderStatusSerializer
-    queryset = Order.objects.prefetch_related("items", "status_history")
+    queryset = Order.objects.select_related("user").prefetch_related(
+        Prefetch("items", queryset=OrderItem.objects.select_related("product")),
+        "status_history",
+    )
     lookup_field = "id"
 
 
@@ -76,7 +91,7 @@ class AdminOrderListView(ListAPIView):
     serializer_class = AdminOrderSerializer
 
     def get_queryset(self):
-        qs = Order.objects.prefetch_related("items", "status_history")
+        qs = Order.objects.prefetch_related(*_order_prefetch()).select_related("user")
         order_status = self.request.query_params.get("status")
         if order_status:
             qs = qs.filter(status=order_status)
@@ -89,7 +104,7 @@ class AdminOrderListView(ListAPIView):
 class AdminOrderDetailView(RetrieveAPIView):
     permission_classes = [IsAdminUser]
     serializer_class = AdminOrderSerializer
-    queryset = Order.objects.prefetch_related("items", "status_history")
+    queryset = Order.objects.select_related("user").prefetch_related(*_order_prefetch())
     lookup_field = "id"
 
 
@@ -97,7 +112,7 @@ class AdminOrderStatusUpdateView(APIView):
     permission_classes = [IsAdminUser]
 
     def patch(self, request, id):
-        order = Order.objects.prefetch_related("items", "status_history").get(pk=id)
+        order = Order.objects.prefetch_related(*_order_prefetch()).get(pk=id)
         serializer = AdminOrderStatusUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         order.set_status(

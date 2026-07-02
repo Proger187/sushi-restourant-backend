@@ -1,3 +1,5 @@
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from rest_framework.generics import (
     ListAPIView,
     ListCreateAPIView,
@@ -7,6 +9,7 @@ from rest_framework.generics import (
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAdminUser
 
+from .cache_utils import invalidate_catalog_cache
 from .models import Category, Product
 from .serializers import (
     CategorySerializer,
@@ -18,18 +21,29 @@ from .utils import validate_image
 
 # --- Public ---
 
+@method_decorator(cache_page(60 * 10), name="dispatch")
 class CategoryListView(ListAPIView):
     permission_classes = [AllowAny]
     serializer_class = CategorySerializer
     queryset = Category.objects.filter(is_active=True)
 
 
+@method_decorator(cache_page(60 * 5), name="dispatch")
 class ProductListView(ListAPIView):
     permission_classes = [AllowAny]
     serializer_class = ProductListSerializer
 
     def get_queryset(self):
-        qs = Product.objects.filter(is_available=True).select_related("category")
+        qs = (
+            Product.objects
+            .filter(is_available=True)
+            .select_related("category")
+            .only(
+                "id", "name", "slug", "price", "image", "weight_g", "pieces",
+                "is_available", "is_featured",
+                "category__id", "category__name", "category__slug",
+            )
+        )
         category_slug = self.request.query_params.get("category")
         if category_slug:
             qs = qs.filter(category__slug=category_slug)
@@ -38,6 +52,7 @@ class ProductListView(ListAPIView):
         return qs
 
 
+@method_decorator(cache_page(60 * 5), name="dispatch")
 class ProductDetailView(RetrieveAPIView):
     permission_classes = [AllowAny]
     serializer_class = ProductDetailSerializer
@@ -58,6 +73,7 @@ class AdminCategoryListCreateView(ListCreateAPIView):
         if image:
             validate_image(image)
         serializer.save()
+        invalidate_catalog_cache()
 
 
 class AdminCategoryUpdateDeleteView(RetrieveUpdateDestroyAPIView):
@@ -72,6 +88,11 @@ class AdminCategoryUpdateDeleteView(RetrieveUpdateDestroyAPIView):
         if image:
             validate_image(image)
         serializer.save()
+        invalidate_catalog_cache()
+
+    def perform_destroy(self, instance):
+        instance.delete()
+        invalidate_catalog_cache()
 
 
 class AdminProductListCreateView(ListCreateAPIView):
@@ -85,6 +106,7 @@ class AdminProductListCreateView(ListCreateAPIView):
         if image:
             validate_image(image)
         serializer.save()
+        invalidate_catalog_cache()
 
 
 class AdminProductUpdateDeleteView(RetrieveUpdateDestroyAPIView):
@@ -99,3 +121,8 @@ class AdminProductUpdateDeleteView(RetrieveUpdateDestroyAPIView):
         if image:
             validate_image(image)
         serializer.save()
+        invalidate_catalog_cache()
+
+    def perform_destroy(self, instance):
+        instance.delete()
+        invalidate_catalog_cache()

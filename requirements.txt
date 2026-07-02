@@ -5,3 +5,9 @@ djangorestframework-simplejwt
 psycopg2-binary
 python-dotenv
 Pillow
+cloudinary
+django-cloudinary-storage
+django-redis
+redis
+django-ratelimit
+gunicorn

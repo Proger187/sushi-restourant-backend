@@ -1,6 +1,9 @@
 import logging
 
 from django.conf import settings as django_settings
+from django.core.cache import cache
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.response import Response
@@ -13,6 +16,20 @@ from .serializers import (
     RestaurantSettingsSerializer,
 )
 from .utils import estimate_minutes, haversine
+
+DELIVERY_ZONES_CACHE_KEY = "delivery_zones_active"
+
+
+def get_active_zones():
+    zones = cache.get(DELIVERY_ZONES_CACHE_KEY)
+    if zones is None:
+        zones = list(DeliveryZone.objects.filter(is_active=True).order_by("max_km"))
+        cache.set(DELIVERY_ZONES_CACHE_KEY, zones, 60 * 30)
+    return zones
+
+
+def invalidate_zone_cache():
+    cache.delete(DELIVERY_ZONES_CACHE_KEY)
 
 logger = logging.getLogger(__name__)
 
@@ -41,16 +58,15 @@ class DeliveryCalculateView(APIView):
         distance = haversine(restaurant_lat, restaurant_lng, lat, lng)
         logger.warning("[Delivery] Distance: %.3f km", distance)
 
-        if not DeliveryZone.objects.filter(is_active=True).exists():
+        zones = get_active_zones()
+        if not zones:
             logger.error(
                 "[Delivery] NO ACTIVE ZONES — run 'python manage.py seed_zones'"
             )
 
-        zone = (
-            DeliveryZone.objects
-            .filter(is_active=True, max_km__gte=distance)
-            .order_by("max_km")
-            .first()
+        zone = next(
+            (z for z in zones if z.max_km >= distance),
+            None,
         )
 
         if not zone:
@@ -70,6 +86,7 @@ class DeliveryCalculateView(APIView):
         })
 
 
+@method_decorator(cache_page(60 * 60), name="dispatch")
 class PublicRestaurantSettingsView(APIView):
     permission_classes = [AllowAny]
 
@@ -94,6 +111,8 @@ class AdminRestaurantSettingsView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        from apps.catalog.cache_utils import invalidate_catalog_cache
+        invalidate_catalog_cache()
         return Response(serializer.data)
 
 
@@ -149,8 +168,20 @@ class AdminDeliveryZoneListCreateView(ListCreateAPIView):
     serializer_class = DeliveryZoneSerializer
     queryset = DeliveryZone.objects.all()
 
+    def perform_create(self, serializer):
+        serializer.save()
+        invalidate_zone_cache()
+
 
 class AdminDeliveryZoneUpdateDeleteView(RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdminUser]
     serializer_class = DeliveryZoneSerializer
     queryset = DeliveryZone.objects.all()
+
+    def perform_update(self, serializer):
+        serializer.save()
+        invalidate_zone_cache()
+
+    def perform_destroy(self, instance):
+        instance.delete()
+        invalidate_zone_cache()
