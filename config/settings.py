@@ -151,3 +151,13 @@ SIMPLE_JWT = {
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
 }
+
+# Production settings
+if os.getenv("RAILWAY_ENVIRONMENT"):
+    DEBUG = False
+    ALLOWED_HOSTS = ["*"]  # потом заменишь на свой домен
+    
+    # Статические файлы через whitenoise
+    MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
+    STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    STATIC_ROOT = BASE_DIR / "staticfiles"
