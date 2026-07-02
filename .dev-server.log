@@ -1,0 +1,4 @@
+Watching for file changes with StatReloader
+[02/Jul/2026 18:10:30] "GET /api/categories/ HTTP/1.1" 200 1448
+[02/Jul/2026 18:10:31] "GET /api/categories/ HTTP/1.1" 200 1448
+[02/Jul/2026 18:10:31] "GET /api/categories/ HTTP/1.1" 200 1448
