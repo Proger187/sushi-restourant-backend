@@ -135,6 +135,15 @@ class AdminTestDeliveryView(APIView):
         })
 
 
+class PublicDeliveryZoneListView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        zones = DeliveryZone.objects.filter(is_active=True).order_by("max_km")
+        serializer = DeliveryZoneSerializer(zones, many=True)
+        return Response(serializer.data)
+
+
 class AdminDeliveryZoneListCreateView(ListCreateAPIView):
     permission_classes = [IsAdminUser]
     serializer_class = DeliveryZoneSerializer
